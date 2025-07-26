@@ -1,0 +1,458 @@
+import React, { useState } from 'react';
+import {
+  View,
+  Text,
+  TouchableOpacity,
+  StyleSheet,
+  SafeAreaView,
+  FlatList,
+  Modal,
+  TextInput,
+  Alert,
+  Dimensions,
+} from 'react-native';
+import { useProject } from '@/src/context/ProjectContext';
+import { Ionicons } from '@expo/vector-icons';
+
+const { width } = Dimensions.get('window');
+
+const CLIENT_COLORS = [
+  '#EF4444', '#F97316', '#F59E0B', '#EAB308',
+  '#84CC16', '#22C55E', '#10B981', '#14B8A6',
+  '#06B6D4', '#0EA5E9', '#3B82F6', '#6366F1',
+  '#8B5CF6', '#A855F7', '#D946EF', '#EC4899',
+];
+
+export default function ProjectsScreen() {
+  const { projects, addProject, deleteProject, selectedProject, setSelectedProject } = useProject();
+  const [modalVisible, setModalVisible] = useState(false);
+  const [projectName, setProjectName] = useState('');
+  const [clientName, setClientName] = useState('');
+  const [hourlyRate, setHourlyRate] = useState('');
+  const [selectedColor, setSelectedColor] = useState(CLIENT_COLORS[0]);
+
+  const handleAddProject = () => {
+    if (!projectName.trim() || !clientName.trim() || !hourlyRate.trim()) {
+      Alert.alert('Missing Information', 'Please fill in all fields.');
+      return;
+    }
+
+    const rate = parseFloat(hourlyRate);
+    if (isNaN(rate) || rate <= 0) {
+      Alert.alert('Invalid Rate', 'Please enter a valid hourly rate.');
+      return;
+    }
+
+    addProject({
+      name: projectName.trim(),
+      client: clientName.trim(),
+      hourlyRate: rate,
+      color: selectedColor,
+    });
+
+    // Reset form
+    setProjectName('');
+    setClientName('');
+    setHourlyRate('');
+    setSelectedColor(CLIENT_COLORS[0]);
+    setModalVisible(false);
+  };
+
+  const handleDeleteProject = (projectId: string) => {
+    Alert.alert(
+      'Delete Project',
+      'Are you sure you want to delete this project? This will also delete all associated time entries.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { 
+          text: 'Delete', 
+          style: 'destructive',
+          onPress: () => deleteProject(projectId)
+        },
+      ]
+    );
+  };
+
+  const renderProject = ({ item }: { item: any }) => (
+    <TouchableOpacity
+      style={[
+        styles.projectCard,
+        selectedProject?.id === item.id && styles.selectedProject
+      ]}
+      onPress={() => setSelectedProject(item)}
+    >
+      <View style={styles.projectHeader}>
+        <View style={styles.projectInfo}>
+          <View style={[styles.colorIndicator, { backgroundColor: item.color }]} />
+          <View style={styles.projectDetails}>
+            <Text style={styles.projectName}>{item.name}</Text>
+            <Text style={styles.clientName}>{item.client}</Text>
+          </View>
+        </View>
+        <TouchableOpacity
+          style={styles.deleteButton}
+          onPress={() => handleDeleteProject(item.id)}
+        >
+          <Ionicons name="trash-outline" size={20} color="#EF4444" />
+        </TouchableOpacity>
+      </View>
+      
+      <View style={styles.projectFooter}>
+        <Text style={styles.hourlyRate}>${item.hourlyRate}/hour</Text>
+        <Text style={styles.totalTime}>0h 0m tracked</Text>
+      </View>
+    </TouchableOpacity>
+  );
+
+  const renderColorOption = (color: string) => (
+    <TouchableOpacity
+      key={color}
+      style={[
+        styles.colorOption,
+        { backgroundColor: color },
+        selectedColor === color && styles.selectedColor
+      ]}
+      onPress={() => setSelectedColor(color)}
+    />
+  );
+
+  return (
+    <SafeAreaView style={styles.container}>
+      <View style={styles.header}>
+        <Text style={styles.title}>Projects</Text>
+        <TouchableOpacity
+          style={styles.addButton}
+          onPress={() => setModalVisible(true)}
+        >
+          <Ionicons name="add" size={24} color="white" />
+        </TouchableOpacity>
+      </View>
+
+      {projects.length === 0 ? (
+        <View style={styles.emptyState}>
+          <Ionicons name="folder-outline" size={64} color="#D1D5DB" />
+          <Text style={styles.emptyTitle}>No Projects Yet</Text>
+          <Text style={styles.emptySubtitle}>
+            Create your first project to start tracking time
+          </Text>
+          <TouchableOpacity
+            style={styles.createFirstButton}
+            onPress={() => setModalVisible(true)}
+          >
+            <Text style={styles.createFirstButtonText}>Create Project</Text>
+          </TouchableOpacity>
+        </View>
+      ) : (
+        <FlatList
+          data={projects}
+          renderItem={renderProject}
+          keyExtractor={(item) => item.id}
+          contentContainerStyle={styles.projectsList}
+          showsVerticalScrollIndicator={false}
+        />
+      )}
+
+      {/* Add Project Modal */}
+      <Modal
+        animationType="slide"
+        transparent={true}
+        visible={modalVisible}
+        onRequestClose={() => setModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>New Project</Text>
+              <TouchableOpacity
+                style={styles.closeButton}
+                onPress={() => setModalVisible(false)}
+              >
+                <Ionicons name="close" size={24} color="#6B7280" />
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.form}>
+              <View style={styles.inputGroup}>
+                <Text style={styles.label}>Project Name</Text>
+                <TextInput
+                  style={styles.input}
+                  value={projectName}
+                  onChangeText={setProjectName}
+                  placeholder="Enter project name"
+                  placeholderTextColor="#9CA3AF"
+                />
+              </View>
+
+              <View style={styles.inputGroup}>
+                <Text style={styles.label}>Client Name</Text>
+                <TextInput
+                  style={styles.input}
+                  value={clientName}
+                  onChangeText={setClientName}
+                  placeholder="Enter client name"
+                  placeholderTextColor="#9CA3AF"
+                />
+              </View>
+
+              <View style={styles.inputGroup}>
+                <Text style={styles.label}>Hourly Rate ($)</Text>
+                <TextInput
+                  style={styles.input}
+                  value={hourlyRate}
+                  onChangeText={setHourlyRate}
+                  placeholder="0.00"
+                  placeholderTextColor="#9CA3AF"
+                  keyboardType="numeric"
+                />
+              </View>
+
+              <View style={styles.inputGroup}>
+                <Text style={styles.label}>Project Color</Text>
+                <View style={styles.colorPicker}>
+                  {CLIENT_COLORS.map(renderColorOption)}
+                </View>
+              </View>
+            </View>
+
+            <View style={styles.modalActions}>
+              <TouchableOpacity
+                style={styles.cancelButton}
+                onPress={() => setModalVisible(false)}
+              >
+                <Text style={styles.cancelButtonText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.saveButton}
+                onPress={handleAddProject}
+              >
+                <Text style={styles.saveButtonText}>Create Project</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+    </SafeAreaView>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: '#F8FAFC',
+  },
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingTop: 20,
+    paddingBottom: 20,
+  },
+  title: {
+    fontSize: 28,
+    fontWeight: 'bold',
+    color: '#1F2937',
+  },
+  addButton: {
+    backgroundColor: '#2563EB',
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 4,
+  },
+  emptyState: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 40,
+  },
+  emptyTitle: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#1F2937',
+    marginTop: 16,
+    marginBottom: 8,
+  },
+  emptySubtitle: {
+    fontSize: 16,
+    color: '#6B7280',
+    textAlign: 'center',
+    marginBottom: 32,
+  },
+  createFirstButton: {
+    backgroundColor: '#2563EB',
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 8,
+  },
+  createFirstButtonText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  projectsList: {
+    paddingHorizontal: 20,
+  },
+  projectCard: {
+    backgroundColor: 'white',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  selectedProject: {
+    borderWidth: 2,
+    borderColor: '#2563EB',
+  },
+  projectHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  projectInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  colorIndicator: {
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+    marginRight: 12,
+  },
+  projectDetails: {
+    flex: 1,
+  },
+  projectName: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#1F2937',
+    marginBottom: 2,
+  },
+  clientName: {
+    fontSize: 14,
+    color: '#6B7280',
+  },
+  deleteButton: {
+    padding: 8,
+  },
+  projectFooter: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  hourlyRate: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#10B981',
+  },
+  totalTime: {
+    fontSize: 14,
+    color: '#6B7280',
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalContent: {
+    backgroundColor: 'white',
+    borderRadius: 16,
+    padding: 24,
+    width: width - 40,
+    maxHeight: '80%',
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 24,
+  },
+  modalTitle: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#1F2937',
+  },
+  closeButton: {
+    padding: 4,
+  },
+  form: {
+    marginBottom: 24,
+  },
+  inputGroup: {
+    marginBottom: 20,
+  },
+  label: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#1F2937',
+    marginBottom: 8,
+  },
+  input: {
+    borderWidth: 1,
+    borderColor: '#D1D5DB',
+    borderRadius: 8,
+    padding: 12,
+    fontSize: 16,
+    color: '#1F2937',
+    backgroundColor: '#F9FAFB',
+  },
+  colorPicker: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12,
+  },
+  colorOption: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    borderWidth: 2,
+    borderColor: 'transparent',
+  },
+  selectedColor: {
+    borderColor: '#1F2937',
+    borderWidth: 3,
+  },
+  modalActions: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: 12,
+  },
+  cancelButton: {
+    flex: 1,
+    paddingVertical: 12,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#D1D5DB',
+    alignItems: 'center',
+  },
+  cancelButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#6B7280',
+  },
+  saveButton: {
+    flex: 1,
+    paddingVertical: 12,
+    borderRadius: 8,
+    backgroundColor: '#2563EB',
+    alignItems: 'center',
+  },
+  saveButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: 'white',
+  },
+});
