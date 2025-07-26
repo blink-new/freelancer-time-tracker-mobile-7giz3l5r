@@ -5,41 +5,36 @@ import {
   TouchableOpacity,
   StyleSheet,
   SafeAreaView,
-  FlatList,
+  ScrollView,
   Modal,
   TextInput,
   Alert,
-  Dimensions,
 } from 'react-native';
-import { useProject } from '@/src/context/ProjectContext';
+import { useProject } from '../src/context/ProjectContext';
 import { Ionicons } from '@expo/vector-icons';
 
-const { width } = Dimensions.get('window');
-
-const CLIENT_COLORS = [
-  '#EF4444', '#F97316', '#F59E0B', '#EAB308',
-  '#84CC16', '#22C55E', '#10B981', '#14B8A6',
-  '#06B6D4', '#0EA5E9', '#3B82F6', '#6366F1',
-  '#8B5CF6', '#A855F7', '#D946EF', '#EC4899',
+const PROJECT_COLORS = [
+  '#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6',
+  '#06B6D4', '#84CC16', '#F97316', '#EC4899', '#6366F1'
 ];
 
 export default function ProjectsScreen() {
-  const { projects, addProject, deleteProject, selectedProject, setSelectedProject } = useProject();
+  const { projects, addProject, deleteProject } = useProject();
   const [modalVisible, setModalVisible] = useState(false);
   const [projectName, setProjectName] = useState('');
   const [clientName, setClientName] = useState('');
   const [hourlyRate, setHourlyRate] = useState('');
-  const [selectedColor, setSelectedColor] = useState(CLIENT_COLORS[0]);
+  const [selectedColor, setSelectedColor] = useState(PROJECT_COLORS[0]);
 
   const handleAddProject = () => {
     if (!projectName.trim() || !clientName.trim() || !hourlyRate.trim()) {
-      Alert.alert('Missing Information', 'Please fill in all fields.');
+      Alert.alert('Error', 'Please fill in all fields');
       return;
     }
 
     const rate = parseFloat(hourlyRate);
     if (isNaN(rate) || rate <= 0) {
-      Alert.alert('Invalid Rate', 'Please enter a valid hourly rate.');
+      Alert.alert('Error', 'Please enter a valid hourly rate');
       return;
     }
 
@@ -54,67 +49,20 @@ export default function ProjectsScreen() {
     setProjectName('');
     setClientName('');
     setHourlyRate('');
-    setSelectedColor(CLIENT_COLORS[0]);
+    setSelectedColor(PROJECT_COLORS[0]);
     setModalVisible(false);
   };
 
-  const handleDeleteProject = (projectId: string) => {
+  const handleDeleteProject = (projectId: string, projectName: string) => {
     Alert.alert(
       'Delete Project',
-      'Are you sure you want to delete this project? This will also delete all associated time entries.',
+      `Are you sure you want to delete "${projectName}"?`,
       [
         { text: 'Cancel', style: 'cancel' },
-        { 
-          text: 'Delete', 
-          style: 'destructive',
-          onPress: () => deleteProject(projectId)
-        },
+        { text: 'Delete', style: 'destructive', onPress: () => deleteProject(projectId) },
       ]
     );
   };
-
-  const renderProject = ({ item }: { item: any }) => (
-    <TouchableOpacity
-      style={[
-        styles.projectCard,
-        selectedProject?.id === item.id && styles.selectedProject
-      ]}
-      onPress={() => setSelectedProject(item)}
-    >
-      <View style={styles.projectHeader}>
-        <View style={styles.projectInfo}>
-          <View style={[styles.colorIndicator, { backgroundColor: item.color }]} />
-          <View style={styles.projectDetails}>
-            <Text style={styles.projectName}>{item.name}</Text>
-            <Text style={styles.clientName}>{item.client}</Text>
-          </View>
-        </View>
-        <TouchableOpacity
-          style={styles.deleteButton}
-          onPress={() => handleDeleteProject(item.id)}
-        >
-          <Ionicons name="trash-outline" size={20} color="#EF4444" />
-        </TouchableOpacity>
-      </View>
-      
-      <View style={styles.projectFooter}>
-        <Text style={styles.hourlyRate}>${item.hourlyRate}/hour</Text>
-        <Text style={styles.totalTime}>0h 0m tracked</Text>
-      </View>
-    </TouchableOpacity>
-  );
-
-  const renderColorOption = (color: string) => (
-    <TouchableOpacity
-      key={color}
-      style={[
-        styles.colorOption,
-        { backgroundColor: color },
-        selectedColor === color && styles.selectedColor
-      ]}
-      onPress={() => setSelectedColor(color)}
-    />
-  );
 
   return (
     <SafeAreaView style={styles.container}>
@@ -128,29 +76,45 @@ export default function ProjectsScreen() {
         </TouchableOpacity>
       </View>
 
-      {projects.length === 0 ? (
-        <View style={styles.emptyState}>
-          <Ionicons name="folder-outline" size={64} color="#D1D5DB" />
-          <Text style={styles.emptyTitle}>No Projects Yet</Text>
-          <Text style={styles.emptySubtitle}>
-            Create your first project to start tracking time
-          </Text>
-          <TouchableOpacity
-            style={styles.createFirstButton}
-            onPress={() => setModalVisible(true)}
-          >
-            <Text style={styles.createFirstButtonText}>Create Project</Text>
-          </TouchableOpacity>
-        </View>
-      ) : (
-        <FlatList
-          data={projects}
-          renderItem={renderProject}
-          keyExtractor={(item) => item.id}
-          contentContainerStyle={styles.projectsList}
-          showsVerticalScrollIndicator={false}
-        />
-      )}
+      <ScrollView style={styles.projectsList} showsVerticalScrollIndicator={false}>
+        {projects.length === 0 ? (
+          <View style={styles.emptyState}>
+            <Ionicons name="folder-outline" size={64} color="#9CA3AF" />
+            <Text style={styles.emptyTitle}>No Projects Yet</Text>
+            <Text style={styles.emptySubtitle}>
+              Create your first project to start tracking time
+            </Text>
+          </View>
+        ) : (
+          projects.map((project) => (
+            <View key={project.id} style={styles.projectCard}>
+              <View style={styles.projectHeader}>
+                <View style={styles.projectInfo}>
+                  <View
+                    style={[styles.projectColor, { backgroundColor: project.color }]}
+                  />
+                  <View>
+                    <Text style={styles.projectName}>{project.name}</Text>
+                    <Text style={styles.clientName}>{project.client}</Text>
+                  </View>
+                </View>
+                <TouchableOpacity
+                  style={styles.deleteButton}
+                  onPress={() => handleDeleteProject(project.id, project.name)}
+                >
+                  <Ionicons name="trash-outline" size={20} color="#EF4444" />
+                </TouchableOpacity>
+              </View>
+              <View style={styles.projectDetails}>
+                <Text style={styles.hourlyRate}>${project.hourlyRate}/hour</Text>
+                <Text style={styles.createdDate}>
+                  Created {new Date(project.createdAt).toLocaleDateString()}
+                </Text>
+              </View>
+            </View>
+          ))
+        )}
+      </ScrollView>
 
       {/* Add Project Modal */}
       <Modal
@@ -209,7 +173,17 @@ export default function ProjectsScreen() {
               <View style={styles.inputGroup}>
                 <Text style={styles.label}>Project Color</Text>
                 <View style={styles.colorPicker}>
-                  {CLIENT_COLORS.map(renderColorOption)}
+                  {PROJECT_COLORS.map((color) => (
+                    <TouchableOpacity
+                      key={color}
+                      style={[
+                        styles.colorOption,
+                        { backgroundColor: color },
+                        selectedColor === color && styles.selectedColor,
+                      ]}
+                      onPress={() => setSelectedColor(color)}
+                    />
+                  ))}
                 </View>
               </View>
             </View>
@@ -222,10 +196,10 @@ export default function ProjectsScreen() {
                 <Text style={styles.cancelButtonText}>Cancel</Text>
               </TouchableOpacity>
               <TouchableOpacity
-                style={styles.saveButton}
+                style={styles.createButton}
                 onPress={handleAddProject}
               >
-                <Text style={styles.saveButtonText}>Create Project</Text>
+                <Text style={styles.createButtonText}>Create Project</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -264,18 +238,21 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.2,
     shadowRadius: 4,
-    elevation: 4,
+    elevation: 3,
+  },
+  projectsList: {
+    flex: 1,
+    paddingHorizontal: 20,
   },
   emptyState: {
-    flex: 1,
-    justifyContent: 'center',
     alignItems: 'center',
-    paddingHorizontal: 40,
+    justifyContent: 'center',
+    paddingTop: 100,
   },
   emptyTitle: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#1F2937',
+    fontSize: 20,
+    fontWeight: '600',
+    color: '#374151',
     marginTop: 16,
     marginBottom: 8,
   },
@@ -283,21 +260,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#6B7280',
     textAlign: 'center',
-    marginBottom: 32,
-  },
-  createFirstButton: {
-    backgroundColor: '#2563EB',
-    paddingHorizontal: 24,
-    paddingVertical: 12,
-    borderRadius: 8,
-  },
-  createFirstButtonText: {
-    color: 'white',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  projectsList: {
-    paddingHorizontal: 20,
   },
   projectCard: {
     backgroundColor: 'white',
@@ -310,10 +272,6 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 3,
   },
-  selectedProject: {
-    borderWidth: 2,
-    borderColor: '#2563EB',
-  },
   projectHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -323,16 +281,12 @@ const styles = StyleSheet.create({
   projectInfo: {
     flexDirection: 'row',
     alignItems: 'center',
-    flex: 1,
   },
-  colorIndicator: {
+  projectColor: {
     width: 16,
     height: 16,
     borderRadius: 8,
     marginRight: 12,
-  },
-  projectDetails: {
-    flex: 1,
   },
   projectName: {
     fontSize: 18,
@@ -347,7 +301,7 @@ const styles = StyleSheet.create({
   deleteButton: {
     padding: 8,
   },
-  projectFooter: {
+  projectDetails: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
@@ -357,9 +311,9 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#10B981',
   },
-  totalTime: {
-    fontSize: 14,
-    color: '#6B7280',
+  createdDate: {
+    fontSize: 12,
+    color: '#9CA3AF',
   },
   modalOverlay: {
     flex: 1,
@@ -371,8 +325,8 @@ const styles = StyleSheet.create({
     backgroundColor: 'white',
     borderRadius: 16,
     padding: 24,
-    width: width - 40,
-    maxHeight: '80%',
+    width: '90%',
+    maxWidth: 400,
   },
   modalHeader: {
     flexDirection: 'row',
@@ -381,7 +335,7 @@ const styles = StyleSheet.create({
     marginBottom: 24,
   },
   modalTitle: {
-    fontSize: 24,
+    fontSize: 20,
     fontWeight: 'bold',
     color: '#1F2937',
   },
@@ -392,12 +346,12 @@ const styles = StyleSheet.create({
     marginBottom: 24,
   },
   inputGroup: {
-    marginBottom: 20,
+    marginBottom: 16,
   },
   label: {
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: '600',
-    color: '#1F2937',
+    color: '#374151',
     marginBottom: 8,
   },
   input: {
@@ -407,7 +361,6 @@ const styles = StyleSheet.create({
     padding: 12,
     fontSize: 16,
     color: '#1F2937',
-    backgroundColor: '#F9FAFB',
   },
   colorPicker: {
     flexDirection: 'row',
@@ -423,7 +376,6 @@ const styles = StyleSheet.create({
   },
   selectedColor: {
     borderColor: '#1F2937',
-    borderWidth: 3,
   },
   modalActions: {
     flexDirection: 'row',
@@ -432,7 +384,7 @@ const styles = StyleSheet.create({
   },
   cancelButton: {
     flex: 1,
-    paddingVertical: 12,
+    padding: 12,
     borderRadius: 8,
     borderWidth: 1,
     borderColor: '#D1D5DB',
@@ -443,14 +395,14 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#6B7280',
   },
-  saveButton: {
+  createButton: {
     flex: 1,
-    paddingVertical: 12,
+    padding: 12,
     borderRadius: 8,
     backgroundColor: '#2563EB',
     alignItems: 'center',
   },
-  saveButtonText: {
+  createButtonText: {
     fontSize: 16,
     fontWeight: '600',
     color: 'white',

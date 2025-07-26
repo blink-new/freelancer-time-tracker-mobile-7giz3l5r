@@ -1,37 +1,23 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-interface Project {
-  id: string;
-  name: string;
-  clientName: string;
-  hourlyRate: number;
-  color: string;
-}
-
 interface Session {
   id: string;
   projectId: string;
   startTime: string;
-  endTime: string;
+  endTime?: string;
   duration: number;
 }
 
 interface TimerContextType {
   isRunning: boolean;
   elapsedTime: number;
-  currentProject: Project | null;
+  currentSession: Session | null;
   sessions: Session[];
-  startTimer: () => void;
+  startTimer: (projectId: string) => void;
   stopTimer: () => void;
+  pauseTimer: () => void;
   resetTimer: () => void;
-  setCurrentProject: (project: Project | null) => void;
-  formatTime: (milliseconds: number) => {
-    hours: string;
-    minutes: string;
-    seconds: string;
-    formatted: string;
-  };
   clearAllSessions: () => void;
 }
 
@@ -53,7 +39,7 @@ export const TimerProvider: React.FC<TimerProviderProps> = ({ children }) => {
   const [isRunning, setIsRunning] = useState(false);
   const [elapsedTime, setElapsedTime] = useState(0);
   const [startTime, setStartTime] = useState<Date | null>(null);
-  const [currentProject, setCurrentProject] = useState<Project | null>(null);
+  const [currentSession, setCurrentSession] = useState<Session | null>(null);
   const [sessions, setSessions] = useState<Session[]>([]);
 
   // Load sessions from storage on mount
@@ -63,7 +49,9 @@ export const TimerProvider: React.FC<TimerProviderProps> = ({ children }) => {
 
   // Save sessions to storage whenever sessions change
   useEffect(() => {
-    saveSessions();
+    if (sessions.length > 0) {
+      saveSessions();
+    }
   }, [sessions]);
 
   // Timer effect
@@ -73,7 +61,8 @@ export const TimerProvider: React.FC<TimerProviderProps> = ({ children }) => {
     if (isRunning && startTime) {
       interval = setInterval(() => {
         const now = new Date();
-        setElapsedTime(now.getTime() - startTime.getTime());
+        const elapsed = Math.floor((now.getTime() - startTime.getTime()) / 1000);
+        setElapsedTime(elapsed);
       }, 1000);
     }
 
@@ -103,70 +92,73 @@ export const TimerProvider: React.FC<TimerProviderProps> = ({ children }) => {
     }
   };
 
-  const startTimer = () => {
-    if (!currentProject) return;
-    
+  const startTimer = (projectId: string) => {
     const now = new Date();
+    const newSession: Session = {
+      id: `session_${Date.now()}`,
+      projectId,
+      startTime: now.toISOString(),
+      duration: 0,
+    };
+
     setStartTime(now);
     setElapsedTime(0);
+    setCurrentSession(newSession);
     setIsRunning(true);
   };
 
   const stopTimer = () => {
-    if (!isRunning || !startTime || !currentProject) return;
+    if (!isRunning || !startTime || !currentSession) return;
 
     const endTime = new Date();
-    const duration = endTime.getTime() - startTime.getTime();
+    const duration = Math.floor((endTime.getTime() - startTime.getTime()) / 1000);
 
-    // Create new session
-    const newSession: Session = {
-      id: `session_${Date.now()}`,
-      projectId: currentProject.id,
-      startTime: startTime.toISOString(),
+    const completedSession: Session = {
+      ...currentSession,
       endTime: endTime.toISOString(),
       duration,
     };
 
-    setSessions(prev => [...prev, newSession]);
+    setSessions(prev => [...prev, completedSession]);
     setIsRunning(false);
     setStartTime(null);
+    setCurrentSession(null);
+    setElapsedTime(0);
+  };
+
+  const pauseTimer = () => {
+    if (isRunning) {
+      setIsRunning(false);
+      setStartTime(null);
+    }
   };
 
   const resetTimer = () => {
     setIsRunning(false);
     setElapsedTime(0);
     setStartTime(null);
+    setCurrentSession(null);
   };
 
-  const formatTime = (milliseconds: number) => {
-    const totalSeconds = Math.floor(milliseconds / 1000);
-    const hours = Math.floor(totalSeconds / 3600);
-    const minutes = Math.floor((totalSeconds % 3600) / 60);
-    const seconds = totalSeconds % 60;
-
-    return {
-      hours: hours.toString().padStart(2, '0'),
-      minutes: minutes.toString().padStart(2, '0'),
-      seconds: seconds.toString().padStart(2, '0'),
-      formatted: `${hours}h ${minutes}m ${seconds}s`,
-    };
-  };
-
-  const clearAllSessions = () => {
+  const clearAllSessions = async () => {
     setSessions([]);
     resetTimer();
+    try {
+      await AsyncStorage.removeItem('timer_sessions');
+    } catch (error) {
+      console.error('Error clearing sessions:', error);
+    }
   };
 
   const value: TimerContextType = {
     isRunning,
     elapsedTime,
-    currentProject,
+    currentSession,
     sessions,
     startTimer,
     stopTimer,
+    pauseTimer,
     resetTimer,
-    setCurrentProject,
-    formatTime,
     clearAllSessions,
   };
 

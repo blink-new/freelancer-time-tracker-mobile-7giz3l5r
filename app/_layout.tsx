@@ -1,14 +1,11 @@
 import { useEffect } from 'react';
 import { Tabs } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { useFrameworkReady } from '@/hooks/useFrameworkReady';
-import { TimerProvider } from '@/src/context/TimerContext';
-import { ProjectProvider } from '@/src/context/ProjectContext';
+import { TimerProvider } from '../src/context/TimerContext';
+import { ProjectProvider } from '../src/context/ProjectContext';
 import { Ionicons } from '@expo/vector-icons';
 
 export default function RootLayout() {
-  useFrameworkReady();
-
   return (
     <ProjectProvider>
       <TimerProvider>

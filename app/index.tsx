@@ -8,8 +8,8 @@ import {
   SafeAreaView,
   Alert,
 } from 'react-native';
-import { useTimer } from '@/src/context/TimerContext';
-import { useProject } from '@/src/context/ProjectContext';
+import { useTimer } from '../src/context/TimerContext';
+import { useProject } from '../src/context/ProjectContext';
 import { Ionicons } from '@expo/vector-icons';
 
 const { width, height } = Dimensions.get('window');

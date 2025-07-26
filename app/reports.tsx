@@ -1,24 +1,47 @@
-import React, { useState } from 'react';
+import React, { useMemo } from 'react';
 import {
   View,
   Text,
-  TouchableOpacity,
   StyleSheet,
   SafeAreaView,
-  FlatList,
-  Alert,
-  Dimensions,
+  ScrollView,
+  TouchableOpacity,
 } from 'react-native';
-import { useProject } from '@/src/context/ProjectContext';
-import { useTimer } from '@/src/context/TimerContext';
+import { useProject } from '../src/context/ProjectContext';
+import { useTimer } from '../src/context/TimerContext';
 import { Ionicons } from '@expo/vector-icons';
-
-const { width } = Dimensions.get('window');
 
 export default function ReportsScreen() {
   const { projects } = useProject();
   const { sessions } = useTimer();
-  const [selectedPeriod, setSelectedPeriod] = useState('week');
+
+  const reportData = useMemo(() => {
+    const projectStats = projects.map(project => {
+      const projectSessions = sessions.filter(session => session.projectId === project.id);
+      const totalSeconds = projectSessions.reduce((sum, session) => sum + session.duration, 0);
+      const totalHours = totalSeconds / 3600;
+      const earnings = totalHours * project.hourlyRate;
+
+      return {
+        project,
+        totalSeconds,
+        totalHours,
+        earnings,
+        sessionCount: projectSessions.length,
+      };
+    });
+
+    const totalEarnings = projectStats.reduce((sum, stat) => sum + stat.earnings, 0);
+    const totalHours = projectStats.reduce((sum, stat) => sum + stat.totalHours, 0);
+    const totalSessions = projectStats.reduce((sum, stat) => sum + stat.sessionCount, 0);
+
+    return {
+      projectStats,
+      totalEarnings,
+      totalHours,
+      totalSessions,
+    };
+  }, [projects, sessions]);
 
   const formatTime = (seconds: number) => {
     const hours = Math.floor(seconds / 3600);
@@ -30,169 +53,141 @@ export default function ReportsScreen() {
     return `$${amount.toFixed(2)}`;
   };
 
-  const calculateProjectStats = () => {
-    return projects.map(project => {
-      const projectSessions = sessions.filter(session => session.projectId === project.id);
-      const totalSeconds = projectSessions.reduce((sum, session) => sum + session.duration, 0);
-      const totalHours = totalSeconds / 3600;
-      const earnings = totalHours * project.hourlyRate;
-
-      return {
-        ...project,
-        totalTime: totalSeconds,
-        totalHours,
-        earnings,
-        sessionCount: projectSessions.length,
-      };
-    });
-  };
-
-  const getTotalStats = () => {
-    const projectStats = calculateProjectStats();
-    const totalTime = projectStats.reduce((sum, project) => sum + project.totalTime, 0);
-    const totalEarnings = projectStats.reduce((sum, project) => sum + project.earnings, 0);
-    const totalSessions = projectStats.reduce((sum, project) => sum + project.sessionCount, 0);
-
-    return {
-      totalTime,
-      totalEarnings,
-      totalSessions,
-      totalHours: totalTime / 3600,
-    };
-  };
-
-  const handleExport = () => {
-    Alert.alert(
-      'Export Data',
-      'Choose export format:',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        { text: 'CSV', onPress: () => exportToCSV() },
-        { text: 'PDF', onPress: () => exportToPDF() },
-      ]
-    );
-  };
-
-  const exportToCSV = () => {
-    // TODO: Implement CSV export
-    Alert.alert('Export', 'CSV export functionality will be implemented soon.');
-  };
-
-  const exportToPDF = () => {
-    // TODO: Implement PDF export
-    Alert.alert('Export', 'PDF export functionality will be implemented soon.');
-  };
-
-  const renderProjectReport = ({ item }: { item: any }) => (
-    <View style={styles.projectCard}>
-      <View style={styles.projectHeader}>
-        <View style={styles.projectInfo}>
-          <View style={[styles.colorIndicator, { backgroundColor: item.color }]} />
-          <View>
-            <Text style={styles.projectName}>{item.name}</Text>
-            <Text style={styles.clientName}>{item.client}</Text>
-          </View>
-        </View>
-        <View style={styles.projectStats}>
-          <Text style={styles.earnings}>{formatCurrency(item.earnings)}</Text>
-          <Text style={styles.timeText}>{formatTime(item.totalTime)}</Text>
-        </View>
-      </View>
-      
-      <View style={styles.projectDetails}>
-        <View style={styles.statItem}>
-          <Text style={styles.statLabel}>Sessions</Text>
-          <Text style={styles.statValue}>{item.sessionCount}</Text>
-        </View>
-        <View style={styles.statItem}>
-          <Text style={styles.statLabel}>Rate</Text>
-          <Text style={styles.statValue}>${item.hourlyRate}/hr</Text>
-        </View>
-        <View style={styles.statItem}>
-          <Text style={styles.statLabel}>Hours</Text>
-          <Text style={styles.statValue}>{item.totalHours.toFixed(1)}h</Text>
-        </View>
-      </View>
-    </View>
-  );
-
-  const totalStats = getTotalStats();
-  const projectStats = calculateProjectStats();
-
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
         <Text style={styles.title}>Reports</Text>
-        <TouchableOpacity style={styles.exportButton} onPress={handleExport}>
+        <TouchableOpacity style={styles.exportButton}>
           <Ionicons name="download-outline" size={20} color="#2563EB" />
-          <Text style={styles.exportText}>Export</Text>
+          <Text style={styles.exportButtonText}>Export</Text>
         </TouchableOpacity>
       </View>
 
-      {/* Period Selector */}
-      <View style={styles.periodSelector}>
-        {['week', 'month', 'year'].map(period => (
-          <TouchableOpacity
-            key={period}
-            style={[
-              styles.periodButton,
-              selectedPeriod === period && styles.selectedPeriod
-            ]}
-            onPress={() => setSelectedPeriod(period)}
-          >
-            <Text style={[
-              styles.periodText,
-              selectedPeriod === period && styles.selectedPeriodText
-            ]}>
-              {period.charAt(0).toUpperCase() + period.slice(1)}
-            </Text>
-          </TouchableOpacity>
-        ))}
-      </View>
-
-      {/* Summary Cards */}
-      <View style={styles.summaryContainer}>
-        <View style={styles.summaryCard}>
-          <Ionicons name="time-outline" size={24} color="#2563EB" />
-          <Text style={styles.summaryValue}>{formatTime(totalStats.totalTime)}</Text>
-          <Text style={styles.summaryLabel}>Total Time</Text>
-        </View>
-        
-        <View style={styles.summaryCard}>
-          <Ionicons name="cash-outline" size={24} color="#10B981" />
-          <Text style={styles.summaryValue}>{formatCurrency(totalStats.totalEarnings)}</Text>
-          <Text style={styles.summaryLabel}>Total Earnings</Text>
-        </View>
-        
-        <View style={styles.summaryCard}>
-          <Ionicons name="play-circle-outline" size={24} color="#F59E0B" />
-          <Text style={styles.summaryValue}>{totalStats.totalSessions}</Text>
-          <Text style={styles.summaryLabel}>Sessions</Text>
-        </View>
-      </View>
-
-      {/* Project Reports */}
-      <View style={styles.projectsSection}>
-        <Text style={styles.sectionTitle}>Project Breakdown</Text>
-        
-        {projectStats.length === 0 ? (
-          <View style={styles.emptyState}>
-            <Ionicons name="bar-chart-outline" size={48} color="#D1D5DB" />
-            <Text style={styles.emptyTitle}>No Data Yet</Text>
-            <Text style={styles.emptySubtitle}>
-              Start tracking time to see your reports
-            </Text>
+      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+        {/* Summary Cards */}
+        <View style={styles.summaryContainer}>
+          <View style={styles.summaryCard}>
+            <Ionicons name="cash-outline" size={24} color="#10B981" />
+            <Text style={styles.summaryValue}>{formatCurrency(reportData.totalEarnings)}</Text>
+            <Text style={styles.summaryLabel}>Total Earnings</Text>
           </View>
-        ) : (
-          <FlatList
-            data={projectStats}
-            renderItem={renderProjectReport}
-            keyExtractor={(item) => item.id}
-            showsVerticalScrollIndicator={false}
-            contentContainerStyle={styles.projectsList}
-          />
-        )}
-      </View>
+
+          <View style={styles.summaryCard}>
+            <Ionicons name="time-outline" size={24} color="#3B82F6" />
+            <Text style={styles.summaryValue}>{formatTime(reportData.totalHours * 3600)}</Text>
+            <Text style={styles.summaryLabel}>Total Hours</Text>
+          </View>
+
+          <View style={styles.summaryCard}>
+            <Ionicons name="list-outline" size={24} color="#F59E0B" />
+            <Text style={styles.summaryValue}>{reportData.totalSessions}</Text>
+            <Text style={styles.summaryLabel}>Sessions</Text>
+          </View>
+        </View>
+
+        {/* Project Breakdown */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Project Breakdown</Text>
+          
+          {reportData.projectStats.length === 0 ? (
+            <View style={styles.emptyState}>
+              <Ionicons name="bar-chart-outline" size={64} color="#9CA3AF" />
+              <Text style={styles.emptyTitle}>No Data Yet</Text>
+              <Text style={styles.emptySubtitle}>
+                Start tracking time to see your reports
+              </Text>
+            </View>
+          ) : (
+            reportData.projectStats.map((stat) => (
+              <View key={stat.project.id} style={styles.projectCard}>
+                <View style={styles.projectHeader}>
+                  <View style={styles.projectInfo}>
+                    <View
+                      style={[styles.projectColor, { backgroundColor: stat.project.color }]}
+                    />
+                    <View>
+                      <Text style={styles.projectName}>{stat.project.name}</Text>
+                      <Text style={styles.clientName}>{stat.project.client}</Text>
+                    </View>
+                  </View>
+                  <View style={styles.projectEarnings}>
+                    <Text style={styles.earningsAmount}>{formatCurrency(stat.earnings)}</Text>
+                    <Text style={styles.hourlyRate}>${stat.project.hourlyRate}/hr</Text>
+                  </View>
+                </View>
+
+                <View style={styles.projectStats}>
+                  <View style={styles.statItem}>
+                    <Text style={styles.statValue}>{formatTime(stat.totalSeconds)}</Text>
+                    <Text style={styles.statLabel}>Time Logged</Text>
+                  </View>
+                  <View style={styles.statItem}>
+                    <Text style={styles.statValue}>{stat.sessionCount}</Text>
+                    <Text style={styles.statLabel}>Sessions</Text>
+                  </View>
+                  <View style={styles.statItem}>
+                    <Text style={styles.statValue}>
+                      {stat.sessionCount > 0 ? formatTime(stat.totalSeconds / stat.sessionCount) : '0h 0m'}
+                    </Text>
+                    <Text style={styles.statLabel}>Avg Session</Text>
+                  </View>
+                </View>
+              </View>
+            ))
+          )}
+        </View>
+
+        {/* Recent Sessions */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Recent Sessions</Text>
+          
+          {sessions.length === 0 ? (
+            <View style={styles.emptySessionsState}>
+              <Text style={styles.emptySessionsText}>No sessions recorded yet</Text>
+            </View>
+          ) : (
+            sessions
+              .slice(-10) // Show last 10 sessions
+              .reverse()
+              .map((session) => {
+                const project = projects.find(p => p.id === session.projectId);
+                return (
+                  <View key={session.id} style={styles.sessionCard}>
+                    <View style={styles.sessionHeader}>
+                      <View style={styles.sessionInfo}>
+                        {project && (
+                          <View
+                            style={[styles.sessionColor, { backgroundColor: project.color }]}
+                          />
+                        )}
+                        <View>
+                          <Text style={styles.sessionProject}>
+                            {project ? project.name : 'Unknown Project'}
+                          </Text>
+                          <Text style={styles.sessionDate}>
+                            {new Date(session.startTime).toLocaleDateString()} at{' '}
+                            {new Date(session.startTime).toLocaleTimeString([], {
+                              hour: '2-digit',
+                              minute: '2-digit'
+                            })}
+                          </Text>
+                        </View>
+                      </View>
+                      <View style={styles.sessionDuration}>
+                        <Text style={styles.durationText}>{formatTime(session.duration)}</Text>
+                        {project && (
+                          <Text style={styles.sessionEarnings}>
+                            {formatCurrency((session.duration / 3600) * project.hourlyRate)}
+                          </Text>
+                        )}
+                      </View>
+                    </View>
+                  </View>
+                );
+              })
+          )}
+        </View>
+      </ScrollView>
     </SafeAreaView>
   );
 }
@@ -225,40 +220,18 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#2563EB',
   },
-  exportText: {
+  exportButtonText: {
     color: '#2563EB',
-    fontSize: 14,
     fontWeight: '600',
     marginLeft: 6,
   },
-  periodSelector: {
-    flexDirection: 'row',
-    marginHorizontal: 20,
-    marginBottom: 20,
-    backgroundColor: 'white',
-    borderRadius: 8,
-    padding: 4,
-  },
-  periodButton: {
+  content: {
     flex: 1,
-    paddingVertical: 8,
-    alignItems: 'center',
-    borderRadius: 6,
-  },
-  selectedPeriod: {
-    backgroundColor: '#2563EB',
-  },
-  periodText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#6B7280',
-  },
-  selectedPeriodText: {
-    color: 'white',
+    paddingHorizontal: 20,
   },
   summaryContainer: {
     flexDirection: 'row',
-    paddingHorizontal: 20,
+    justifyContent: 'space-between',
     marginBottom: 24,
     gap: 12,
   },
@@ -275,7 +248,7 @@ const styles = StyleSheet.create({
     elevation: 3,
   },
   summaryValue: {
-    fontSize: 18,
+    fontSize: 20,
     fontWeight: 'bold',
     color: '#1F2937',
     marginTop: 8,
@@ -286,9 +259,8 @@ const styles = StyleSheet.create({
     color: '#6B7280',
     textAlign: 'center',
   },
-  projectsSection: {
-    flex: 1,
-    paddingHorizontal: 20,
+  section: {
+    marginBottom: 24,
   },
   sectionTitle: {
     fontSize: 20,
@@ -297,25 +269,21 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   emptyState: {
-    flex: 1,
-    justifyContent: 'center',
     alignItems: 'center',
+    justifyContent: 'center',
     paddingVertical: 60,
   },
   emptyTitle: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#1F2937',
-    marginTop: 12,
+    color: '#374151',
+    marginTop: 16,
     marginBottom: 8,
   },
   emptySubtitle: {
     fontSize: 14,
     color: '#6B7280',
     textAlign: 'center',
-  },
-  projectsList: {
-    paddingBottom: 20,
   },
   projectCard: {
     backgroundColor: 'white',
@@ -332,60 +300,116 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 12,
+    marginBottom: 16,
   },
   projectInfo: {
     flexDirection: 'row',
     alignItems: 'center',
-    flex: 1,
   },
-  colorIndicator: {
-    width: 12,
-    height: 12,
-    borderRadius: 6,
+  projectColor: {
+    width: 16,
+    height: 16,
+    borderRadius: 8,
     marginRight: 12,
   },
   projectName: {
     fontSize: 16,
     fontWeight: '600',
     color: '#1F2937',
+    marginBottom: 2,
   },
   clientName: {
     fontSize: 14,
     color: '#6B7280',
-    marginTop: 2,
   },
-  projectStats: {
+  projectEarnings: {
     alignItems: 'flex-end',
   },
-  earnings: {
+  earningsAmount: {
     fontSize: 18,
     fontWeight: 'bold',
     color: '#10B981',
+    marginBottom: 2,
   },
-  timeText: {
-    fontSize: 14,
+  hourlyRate: {
+    fontSize: 12,
     color: '#6B7280',
-    marginTop: 2,
   },
-  projectDetails: {
+  projectStats: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    paddingTop: 12,
-    borderTopWidth: 1,
-    borderTopColor: '#F3F4F6',
   },
   statItem: {
     alignItems: 'center',
   },
+  statValue: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#1F2937',
+    marginBottom: 4,
+  },
   statLabel: {
     fontSize: 12,
     color: '#6B7280',
-    marginBottom: 4,
   },
-  statValue: {
+  emptySessionsState: {
+    backgroundColor: 'white',
+    padding: 24,
+    borderRadius: 12,
+    alignItems: 'center',
+  },
+  emptySessionsText: {
+    fontSize: 14,
+    color: '#6B7280',
+  },
+  sessionCard: {
+    backgroundColor: 'white',
+    borderRadius: 8,
+    padding: 12,
+    marginBottom: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 1,
+  },
+  sessionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  sessionInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  sessionColor: {
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    marginRight: 10,
+  },
+  sessionProject: {
     fontSize: 14,
     fontWeight: '600',
     color: '#1F2937',
+    marginBottom: 2,
+  },
+  sessionDate: {
+    fontSize: 12,
+    color: '#6B7280',
+  },
+  sessionDuration: {
+    alignItems: 'flex-end',
+  },
+  durationText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#1F2937',
+    marginBottom: 2,
+  },
+  sessionEarnings: {
+    fontSize: 12,
+    color: '#10B981',
   },
 });
